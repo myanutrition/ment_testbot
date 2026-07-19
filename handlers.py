@@ -60,11 +60,14 @@ def _check_sub_kb() -> InlineKeyboardMarkup:
 
 def _question_kb(index: int) -> InlineKeyboardMarkup:
     q = QUESTIONS[index]
+    letters = list(q["options"].keys())
     buttons = [
-        [InlineKeyboardButton(text=f"{letter}. {text}", callback_data=f"ans:{index}:{letter}")]
-        for letter, text in q["options"].items()
+        InlineKeyboardButton(text=letter, callback_data=f"ans:{index}:{letter}")
+        for letter in letters
     ]
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
+    # Раскладываем кнопки по 2 в ряд
+    rows = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def _next_kb(index: int) -> InlineKeyboardMarkup:
@@ -152,7 +155,13 @@ async def send_question(message: Message, user_id: int, first: bool = False):
 
     index = user_state.get_current_index(user_id)
     q = QUESTIONS[index]
-    text = f"<b>Вопрос {index + 1} из {TOTAL_QUESTIONS}</b>\n\n{q['question']}"
+
+    options_text = "\n".join(f"{letter}. {text}" for letter, text in q["options"].items())
+    text = (
+        f"<b>Вопрос {index + 1} из {TOTAL_QUESTIONS}</b>\n\n"
+        f"{q['question']}\n\n"
+        f"{options_text}"
+    )
     await message.answer(text, reply_markup=_question_kb(index), parse_mode="HTML")
 
 
