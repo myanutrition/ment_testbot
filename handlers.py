@@ -6,6 +6,7 @@
 - прохождение теста
 - команда /stats для админа
 """
+import asyncio
 import logging
 import os
 
@@ -25,7 +26,6 @@ import user_state
 from quiz_data import (
     QUESTIONS,
     INTRO_TEXT,
-    FINAL_TEXT,
     MENTORSHIP_PITCH,
     RISK_QUESTION_IDS,
     RISK_WARNING_TEXT,
@@ -217,12 +217,13 @@ async def on_next(callback: CallbackQuery):
         )
 
         if wrong_risk:
+            await asyncio.sleep(2)
             numbers = ", ".join(str(n) for n in wrong_risk)
             await callback.message.answer(
                 RISK_WARNING_TEXT.format(numbers=numbers), parse_mode="HTML"
             )
 
-        await callback.message.answer(FINAL_TEXT, parse_mode="HTML")
+        await asyncio.sleep(2)
         await callback.message.answer(MENTORSHIP_PITCH, reply_markup=_mentorship_kb(), parse_mode="HTML")
     else:
         user_state.advance(user_id)
