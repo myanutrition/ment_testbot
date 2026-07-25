@@ -22,7 +22,15 @@ from aiogram.exceptions import TelegramBadRequest
 
 import config
 import user_state
-from quiz_data import QUESTIONS, INTRO_TEXT, FINAL_TEXT, MENTORSHIP_PITCH
+from quiz_data import (
+    QUESTIONS,
+    INTRO_TEXT,
+    FINAL_TEXT,
+    MENTORSHIP_PITCH,
+    RISK_QUESTION_IDS,
+    RISK_WARNING_TEXT,
+    get_result_level,
+)
 from database import (
     log_event,
     EVENT_BOT_OPENED,
@@ -171,10 +179,14 @@ async def on_answer(callback: CallbackQuery):
     index = int(idx_str)
     q = QUESTIONS[index]
     correct = q["correct"]
+    is_correct = letter == correct
+    is_risk = q["id"] in RISK_QUESTION_IDS
 
-    await callback.answer("Верно! ✅" if letter == correct else f"Правильный ответ: {correct}")
+    user_state.register_answer(callback.from_user.id, q["id"], is_correct, is_risk)
 
-    verdict = "✅ Верно!" if letter == correct else f"Правильный ответ: <b>{correct}</b>"
+    await callback.answer("Верно! ✅" if is_correct else f"Правильный ответ: {correct}")
+
+    verdict = "✅ Верно!" if is_correct else f"Правильный ответ: <b>{correct}</b>"
     text = f"{verdict}\n\n<b>Разбор:</b>\n{q['explanation']}"
     await callback.message.answer(text, reply_markup=_next_kb(index), parse_mode="HTML")
 
@@ -188,7 +200,28 @@ async def on_next(callback: CallbackQuery):
 
     if index >= TOTAL_QUESTIONS - 1:
         log_event(user_id, EVENT_QUIZ_COMPLETED)
+
+        score = user_state.get_score(user_id)
+        wrong_risk = sorted(user_state.get_wrong_risk(user_id))
         user_state.clear(user_id)
+
+        level = get_result_level(score)
+        result_text = (
+            f"🎯 <b>Ваш результат: {score} из {TOTAL_QUESTIONS}</b>\n\n"
+            f"{level['emoji']} <b>{level['title']}</b>\n\n"
+            f"{level['body']}\n\n"
+            f"<b>Итог:</b>\n{level['itog']}"
+        )
+        await callback.message.answer(
+            result_text, reply_markup=_mentorship_kb(), parse_mode="HTML"
+        )
+
+        if wrong_risk:
+            numbers = ", ".join(str(n) for n in wrong_risk)
+            await callback.message.answer(
+                RISK_WARNING_TEXT.format(numbers=numbers), parse_mode="HTML"
+            )
+
         await callback.message.answer(FINAL_TEXT, parse_mode="HTML")
         await callback.message.answer(MENTORSHIP_PITCH, reply_markup=_mentorship_kb(), parse_mode="HTML")
     else:
